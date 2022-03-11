@@ -177,9 +177,9 @@ class MainWindow(QMainWindow):
         arr = np.array(ptr).reshape(image.height(), image.width(), 3)
         return arr
 
+
     def __make_median(self):
         start_time = time.time()
-        # image_arr = self.__QImage2array(self.cur_img)
         try:
             image_arr = self.__QImage2array(self.cur_img)
         except Exception as e:
@@ -207,14 +207,6 @@ class MainWindow(QMainWindow):
             image_arr = self.__QImage2array(self.cur_img)
         except:
             return
-
-        # pts1 = np.float32([[50, 50],
-        #                    [200, 50],
-        #                    [50, 200]])
-
-        # pts2 = np.float32([[10, 100],
-        #                    [200, 50],
-        #                    [100, 250]])
 
         pts1 = np.float32([[0, 0],
                            [1, 0],
