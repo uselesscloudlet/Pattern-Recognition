@@ -3,9 +3,9 @@ import numpy as np
 import time
 import cv2 as cv
 
-from PyQt6.QtCore import QSize, Qt, QFile, QRectF, QRegularExpression, QFileInfo, QDir
-from PyQt6.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QLabel, QFileDialog, QMessageBox
-from PyQt6.QtGui import QAction, QPixmap, QImage
+from PyQt6.QtCore import (QSize, Qt, QFile, QRectF, QRegularExpression, QFileInfo, QDir)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QLabel, QFileDialog, QMessageBox)
+from PyQt6.QtGui import (QAction, QPixmap, QImage)
 
 
 class MainWindow(QMainWindow):
@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         self.affine_plugin = QAction('&Affine', self)
         self.rotate_plugin = QAction('&Rotate', self)
         self.cartoon_plugin = QAction('&Cartoon', self)
-        self.erode_plugin = QAction('Erode', self)
+        self.erode_plugin = QAction('&Erode', self)
         self.sharpen_plugin = QAction('&Sharpen', self)
 
         filters_actions = [self.median_filter,

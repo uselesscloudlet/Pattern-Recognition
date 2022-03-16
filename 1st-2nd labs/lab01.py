@@ -1,7 +1,7 @@
 import sys
 
-from PyQt6.QtCore import QSize, Qt, QFile, QRectF, QRegularExpression, QFileInfo, QDir
-from PyQt6.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QLabel, QFileDialog, QMessageBox
+from PyQt6.QtCore import (QSize, Qt, QFile, QRectF, QRegularExpression, QFileInfo, QDir)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QLabel, QFileDialog, QMessageBox)
 from PyQt6.QtGui import QAction, QPixmap
 
 
