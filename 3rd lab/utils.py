@@ -13,7 +13,7 @@ def get_data_path():
 def new_saved_video_name():
     time = QDateTime.currentDateTime()
 
-    return time.toString('yyyy-MM-dd+HH:mm:ss')
+    return time.toString('yyyy-MM-dd+HH-mm-ss')
 
 
 def get_saved_video_path(name: str, postfix: str):

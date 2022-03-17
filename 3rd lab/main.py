@@ -39,19 +39,8 @@ class MainWindow(QMainWindow):
         main_layout = QGridLayout()
 
         if self.USE_CAMERA:
-            cameras = QMediaDevices.videoInputs()
-
-            if not cameras:
-                sys.exit()
-
-            self.camera = QCamera(cameras[0])
-
-            capture_session = QMediaCaptureSession()
-            capture_session.setCamera(self.camera)
-
-            video = QVideoWidget()
-            main_layout.addWidget(video, 0, 0, 12, 1)
-            capture_session.setVideoOutput(video)
+            self.video = QVideoWidget()
+            main_layout.addWidget(self.video, 0, 0, 12, 1)
         else:
             self.image_scene = QGraphicsScene(self)
             self.image_view = QGraphicsView(self.image_scene)
@@ -60,9 +49,9 @@ class MainWindow(QMainWindow):
         tools_layout = QGridLayout()
         main_layout.addLayout(tools_layout, 12, 0, 1, 1)
 
-        monitor_check_box = QCheckBox(self)
-        monitor_check_box.setText('Monitor On/Off')
-        tools_layout.addWidget(monitor_check_box, 0, 0)
+        self.monitor_check_box = QCheckBox(self)
+        self.monitor_check_box.setText('Monitor On/Off')
+        tools_layout.addWidget(self.monitor_check_box, 0, 0)
 
         self.record_button = QPushButton()
         self.record_button.setText('Record')
@@ -80,6 +69,8 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.saved_list, 13, 0, 4, 1)
 
         self.record_button.clicked.connect(self.__recording_start_stop)
+        self.monitor_check_box.stateChanged.connect(
+            self.__update_monitor_status)
 
         widget = QWidget()
         widget.setLayout(main_layout)
@@ -92,15 +83,15 @@ class MainWindow(QMainWindow):
         open_camera_action = QAction('&Open Camera', self)
         open_camera_action.triggered.connect(self.__open_camera)
 
-        calculate_FPS_action = QAction('&Calculate FPS', self)
-        calculate_FPS_action.triggered.connect(self.__calculate_fps)
+        # calculate_FPS_action = QAction('&Calculate FPS', self)
+        # calculate_FPS_action.triggered.connect(self.__calculate_fps)
 
         exit_action = QAction('&Exit', self)
         exit_action.triggered.connect(self.close)
 
         actions = [camera_info_action,
                    open_camera_action,
-                   calculate_FPS_action,
+                   #    calculate_FPS_action,
                    exit_action]
 
         self.file_menu.addActions(actions)
@@ -111,10 +102,13 @@ class MainWindow(QMainWindow):
             self.capturer.set_video_saving_status(
                 CaptureThread.VideoSavingStatus.STARTING)
             self.record_button.setText('Stop Recording')
+            self.monitor_check_box.setCheckState(Qt.CheckState.Unchecked)
+            self.monitor_check_box.setEnabled(False)
         elif text == 'Stop Recording' and self.capturer is not None:
             self.capturer.set_video_saving_status(
                 CaptureThread.VideoSavingStatus.STOPPING)
             self.record_button.setText('Record')
+            self.monitor_check_box.setEnabled(True)
 
     def __show_camera_info(self):
         cameras = QMediaDevices.videoInputs()
@@ -125,6 +119,17 @@ class MainWindow(QMainWindow):
 
     def __open_camera(self):
         if self.USE_CAMERA:
+            cameras = QMediaDevices.videoInputs()
+
+            if not cameras:
+                self.close()
+
+            self.camera = QCamera(cameras[0])
+
+            self.capture_session = QMediaCaptureSession()
+            self.capture_session.setCamera(self.camera)
+            self.capture_session.setVideoOutput(self.video)
+
             self.camera.start()
         else:
             if self.capturer is not None:
@@ -132,6 +137,8 @@ class MainWindow(QMainWindow):
                 self.capturer.signals.frame_captured.disconnect(
                     self.__update_frame)
                 self.capturer.signals.fps_changed.disconnect(self.__update_fps)
+                self.capturer.signals.data_changed.disconnect(
+                    self.__update_data)
                 self.capturer.signals.video_saved.disconnect(
                     self.__append_saved_video)
 
@@ -139,6 +146,7 @@ class MainWindow(QMainWindow):
             self.capturer = CaptureThread(camID, self.data_lock)
             self.capturer.signals.frame_captured.connect(self.__update_frame)
             self.capturer.signals.fps_changed.connect(self.__update_fps)
+            self.capturer.signals.data_changed.connect(self.__update_data)
             self.capturer.signals.video_saved.connect(
                 self.__append_saved_video)
             self.capturer.start()
@@ -180,6 +188,12 @@ class MainWindow(QMainWindow):
         if self.capturer is not None:
             self.capturer.start_calc_fps()
 
+    def __update_data(self, fps: float, mean: float, std: float):
+        fps_info = f'FPS: {fps}; '
+        mean_info = f'mean: {mean}; '
+        std_info = f'std: {std};'
+        self.main_status_label.setText(fps_info + mean_info + std_info)
+
     def __populate_saved_list(self):
         dir = QDir(get_data_path())
         name_filters = ['*.jpg']
@@ -193,9 +207,19 @@ class MainWindow(QMainWindow):
             item = QStandardItem()
             self.list_model.appendRow(item)
             index = self.list_model.indexFromItem(item)
-            self.list_model.setData(index, QPixmap(cover).scaledToHeight(
+            self.list_model.setData(index, QPixmap(cover.absoluteFilePath()).scaledToHeight(
                 145), Qt.ItemDataRole.DecorationRole)
             self.list_model.setData(index, name, Qt.ItemDataRole.DisplayRole)
+
+    def __update_monitor_status(self, status: bool):
+        if self.capturer is None:
+            return
+        if status:
+            self.capturer.set_motion_detecting_status(True)
+            self.record_button.setEnabled(False)
+        else:
+            self.capturer.set_motion_detecting_status(False)
+            self.record_button.setEnabled(True)
 
 
 def main():
