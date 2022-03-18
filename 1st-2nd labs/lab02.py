@@ -3,7 +3,10 @@ import numpy as np
 import time
 import cv2 as cv
 
-from PyQt6.QtCore import (QSize, Qt, QFile, QRectF, QRegularExpression, QFileInfo, QDir)
+from PIL import Image
+import io
+
+from PyQt6.QtCore import (QSize, Qt, QFile, QRectF, QRegularExpression, QFileInfo, QDir, QIODeviceBase, QBuffer)
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QLabel, QFileDialog, QMessageBox)
 from PyQt6.QtGui import (QAction, QPixmap, QImage)
 
@@ -172,14 +175,14 @@ class MainWindow(QMainWindow):
 
     def __QImage2array(self, image):
         image = image.pixmap().toImage().convertToFormat(QImage.Format.Format_RGB888)
-        ptr = image.constBits()
-        ptr.setsize(image.sizeInBytes())
-        arr = np.array(ptr).reshape(image.height(), image.width(), 3)
-        return arr
+        buffer = QBuffer()
+        buffer.open(QIODeviceBase.OpenModeFlag.ReadWrite)
+        image.save(buffer, "PNG")
+        pil_im = Image.open(io.BytesIO(buffer.data()))
+        return np.array(pil_im)
 
 
     def __make_median(self):
-        start_time = time.time()
         try:
             image_arr = self.__QImage2array(self.cur_img)
         except Exception as e:
@@ -189,14 +192,16 @@ class MainWindow(QMainWindow):
         w, h, c = image_arr.shape
         k = 3
         size = k // 2
-        _img = np.zeros((w + 2 * size, h + 2 * size, c), dtype=float)
-        _img[size:size+w, size:size+h] = image_arr.copy().astype(float)
+        _img = np.zeros((w + 2 * size, h + 2 * size, c), dtype=np.float32)
+        _img[size:size+w, size:size+h] = image_arr.copy().astype(np.float32)
         dst = _img.copy()
+        start_time = time.time()
 
         for x in np.arange(w):
             for y in np.arange(h):
                 for z in np.arange(c):
                     dst[x+size, y+size, z] = np.median(_img[x:x+k, y:y+k, z])
+        # dst = cv.medianBlur(_img, k)
 
         dst = dst[size:size+w, size:size+h].astype(np.uint8)
         print("--- %s seconds ---" % (time.time() - start_time))
