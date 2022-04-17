@@ -201,9 +201,13 @@ class MainWindow(QMainWindow):
             for y in np.arange(h):
                 for z in np.arange(c):
                     dst[x+size, y+size, z] = np.median(_img[x:x+k, y:y+k, z])
-        # dst = cv.medianBlur(_img, k)
 
         dst = dst[size:size+w, size:size+h].astype(np.uint8)
+
+        dst_2 = cv.medianBlur(image_arr, k)
+        diff = cv.absdiff(dst, dst_2)
+        print(diff.shape)
+        cv.imshow('color image', diff)
         print("--- %s seconds ---" % (time.time() - start_time))
         self.__show_filtered_image(dst)
 

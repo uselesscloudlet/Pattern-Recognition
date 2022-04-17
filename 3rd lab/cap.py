@@ -12,7 +12,8 @@ class Communicate(QObject):
     fps_changed = pyqtSignal(float)
     frame_captured = pyqtSignal(np.ndarray)
     video_saved = pyqtSignal(str)
-    data_changed = pyqtSignal(float, float, float)
+    data_changed = pyqtSignal(float, np.ndarray, np.ndarray)
+    cv_data_changed = pyqtSignal(float, np.ndarray, np.ndarray)
 
 
 class CaptureThread(QThread):
@@ -180,10 +181,10 @@ class CaptureThread(QThread):
         # if count without numpy, we will iterate by every pixel and:
         # *a. get mean of every pixel (r + g + b) / 3 and get mean of frame (sum of every mean of pixel / area of frame (h * w))
         # b. get sums of R, G, B channels, divide every by area of frame
-        mean_frame = round(np.mean(frame), 2)
+        mean_frame = np.round(np.mean(frame, axis=(1, 0)), 2)
 
         # another implementation of std: std = np.sqrt(((frame - mean)**2).mean((1,2), keepdims=True))
-        std_frame = round(np.std(frame), 2)
+        std_frame = np.round(np.std(frame, axis=(1, 0)), 2)
 
         self.signals.data_changed.emit(
             round(self.fps, 2), mean_frame, std_frame)
