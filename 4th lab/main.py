@@ -1,10 +1,11 @@
+from functools import partial
 import sys
 import numpy as np
 from enum import Enum, auto
 
-from PyQt6.QtCore import (QSize, Qt, QDir, QMutex, QRectF, pyqtSlot, QPoint)
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsScene, QGraphicsView,
-                             QLabel, QMessageBox, QGridLayout, QWidget, QCheckBox, QPushButton, QListView, QVBoxLayout, QFormLayout, QSlider)
+from PyQt6.QtCore import (QSize, Qt, QRectF)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
+                             QLabel, QGridLayout, QWidget, QPushButton, QVBoxLayout, QFormLayout, QSlider)
 from PyQt6.QtGui import (QAction, QPixmap, QImage)
 
 from cap import CaptureThread
@@ -53,7 +54,7 @@ class MainWindow(QMainWindow):
         self.fps_l = QLabel('FPS')
         self.mean_pi_l = QLabel('Mean Pixel Intensity')
         self.pi_std_l = QLabel('Pixel Intensity STD')
-        self.min_max_pi_l = QLabel('Max / Min Pixel Intensity')
+        self.min_max_pi_l = QLabel('Min / Max Pixel Intensity')
         self.coords_bright_l = QLabel('Coords and Pixel Brightness')
 
         self.info_layout = QFormLayout()
@@ -64,7 +65,7 @@ class MainWindow(QMainWindow):
         self.info_layout.addWidget(self.coords_bright_l)
 
         self.main_layout.addWidget(self.image_view, 0, 0)
-        self.main_layout.addLayout(self.info_layout, 0, 1)
+        self.main_layout.addLayout(self.info_layout, 0, 1, 1, 3)
 
         widget = QWidget()
         widget.setLayout(self.main_layout)
@@ -91,11 +92,13 @@ class MainWindow(QMainWindow):
         self.pi_std = None
         self.min_max_pi = None
         self.coords_bright = None
-        
+
         self.click_pos = None
         self.mouse_pos = None
         self.release_pos = None
         self.bbox_status = self.SelectState.NO_SELECTED_POINTS
+
+        self.slider_info = dict()
 
     def __turn_on_camera(self):
         if self.capturer is not None:
@@ -107,7 +110,8 @@ class MainWindow(QMainWindow):
             )
             self.capturer.signals.mean_pi.disconnect(self.__update_mean_pi)
             self.capturer.signals.pi_std.disconnect(self.__update_pi_std)
-            self.capturer.signals.min_max_pi.disconnect(self.__update_min_max_pi)
+            self.capturer.signals.min_max_pi.disconnect(
+                self.__update_min_max_pi)
             self.capturer.signals.update_data.disconnect(self.__update_data)
         else:
             camera_id = 0
@@ -140,10 +144,10 @@ class MainWindow(QMainWindow):
 
     def __update_mean_pi(self, mean_pi: np.ndarray):
         self.mpi = mean_pi
-    
+
     def __update_pi_std(self, pi_std: np.ndarray):
         self.pi_std = pi_std
-    
+
     def __update_min_max_pi(self, min_max_pi):
         self.min_max_pi = min_max_pi
 
@@ -185,45 +189,95 @@ class MainWindow(QMainWindow):
             if self.capturer is not None:
                 self.capturer.bbox = bbox
             self.capturer.current_mode = self.capturer.DetectionMode.MANUAL
-            self.capturer.manual_state = self.capturer.ManualModeState.INIT
+            self.capturer.mode_state = self.capturer.ModeState.INIT
             self.bbox_status = self.SelectState.TWO_POINTS_ARE_SELECTED
 
     def __update_data(self):
         self.fps_l.setText(f'FPS: {self.fps}')
-        self.mean_pi_l.setText(f'Mean Pixel Intensity:\n{np.round(self.mpi, 2).flatten()}')
-        self.pi_std_l.setText(f'Pixel Intensity STD:\n{np.round(self.pi_std, 2).flatten()}')
-        self.min_max_pi_l.setText(f'Max / Min Pixel Intensity:\n{self.min_max_pi}')
-        self.coords_bright_l.setText(f'Coords and Pixel Brightness:\n{self.coords_bright}')
+        self.mean_pi_l.setText(
+            f'Mean Pixel Intensity:\n{np.round(self.mpi, 2).flatten()}')
+        self.pi_std_l.setText(
+            f'Pixel Intensity STD:\n{np.round(self.pi_std, 2).flatten()}')
+        self.min_max_pi_l.setText(
+            f'Min / Max Pixel Intensity:\n{self.min_max_pi}')
+        self.coords_bright_l.setText(
+            f'Coords and Pixel Brightness:\n{self.coords_bright}')
 
     def __manual_mode(self):
         self.capturer.bbox = None
         self.capturer.current_mode = self.capturer.current_mode.DRAW
+        self.capturer.mode_state = self.capturer.ModeState.DEFAULT
         self.bbox_status = self.SelectState.SELECTING_POINTS
+        self.__clear_sliders()
 
     def __motion_mode(self):
         self.capturer.bbox = None
         self.capturer.current_mode = self.capturer.current_mode.MOTION
-        
+        self.capturer.mode_state = self.capturer.ModeState.DEFAULT
+        self.__clear_sliders()
+        min_size_slider = self.__create_custom_slider(
+            'Min Size', 0, 5000, 150, 0)
+        max_size_slider = self.__create_custom_slider(
+            'Max Size', 0, 5000, 150, 2500)
+        h_min_slider = self.__create_custom_slider('H min', 0, 255, 150, 0)
+        h_max_slider = self.__create_custom_slider('H max', 0, 255, 150, 255)
+        s_min_slider = self.__create_custom_slider('S min', 0, 255, 150, 0)
+        s_max_slider = self.__create_custom_slider('S max', 0, 255, 150, 255)
+        v_min_slider = self.__create_custom_slider('V min', 0, 255, 150, 0)
+        v_max_slider = self.__create_custom_slider('V max', 0, 255, 150, 255)
+        btn = QPushButton('Применить')
+        btn.clicked.connect(self.__apply_det_params)
+
+        self.info_layout.addRow(min_size_slider)
+        self.info_layout.addRow(max_size_slider)
+        self.info_layout.addRow(h_min_slider)
+        self.info_layout.addRow(h_max_slider)
+        self.info_layout.addRow(s_min_slider)
+        self.info_layout.addRow(s_max_slider)
+        self.info_layout.addRow(v_min_slider)
+        self.info_layout.addRow(v_max_slider)
+        self.info_layout.addRow(btn)
+
     def __contrast_mode(self):
         self.capturer.bbox = None
         self.capturer.current_mode = self.capturer.current_mode.CONTRAST
-        # test = QSlider(Qt.Orientation.Horizontal)
-        # test.setMinimum(0)
-        # test.setMaximum(255)
-        # test.setMaximumWidth(150)
-        # test.setValue(0)
+        self.capturer.mode_state = self.capturer.ModeState.DEFAULT
+        self.__clear_sliders()
+        # min_size_slider = self.__create_custom_slider('Min Size', 0, 255, 150, 0)
+        # max_size_slider = self.__create_custom_slider('Max Size', 0, 5000, 150, 2500)
 
-        # test_2 = QSlider(Qt.Orientation.Horizontal)
-        # test_2.setMinimum(0)
-        # test_2.setMaximum(255)
-        # test_2.setMaximumWidth(150)
-        # test_2.setValue(0)
+        # self.info_layout.addRow(min_size_slider)
+        # self.info_layout.addRow(max_size_slider)
 
-        # self.params_layout = QFormLayout()
-        # self.params_layout.addRow()
-        # self.params_layout.addRow(test)
-        # self.params_layout.addRow(test_2)
-        # self.main_layout.addLayout(self.params_layout, 1, 1, 1, 2)
+    def __clear_sliders(self):
+        count = self.info_layout.count()
+        for i in reversed(range(5, count)):
+            self.info_layout.removeRow(i)
+
+    def __create_custom_slider(self, label, min_val, max_val, max_width, first_val):
+        l = QLabel(label)
+        sl = QSlider(Qt.Orientation.Horizontal)
+        sl.setMinimum(min_val)
+        sl.setMaximum(max_val)
+        sl.setMaximumWidth(max_width)
+        sl.setValue(first_val)
+        sl.valueChanged.connect(partial(self.value_changed, name=label))
+        self.slider_info[label] = first_val
+        self.capturer.slider_info[label] = first_val
+
+        layout = QVBoxLayout()
+        layout.addWidget(l)
+        layout.addWidget(sl)
+
+        return layout
+
+    def value_changed(self, val, name):
+        self.slider_info[name] = val
+        self.capturer.slider_info = self.slider_info
+
+    def __apply_det_params(self):
+        self.capturer.mode_state = self.capturer.ModeState.INIT
+
 
 def main():
     app = QApplication(sys.argv)

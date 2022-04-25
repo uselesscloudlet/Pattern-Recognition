@@ -7,7 +7,6 @@ from PyQt6.QtCore import (
 
 from utils import new_saved_video_name, get_saved_video_path
 
-
 class Communicate(QObject):
     fps_changed = pyqtSignal(float)
     frame_captured = pyqtSignal(np.ndarray)
