@@ -2,10 +2,11 @@ from functools import partial
 import sys
 import numpy as np
 from enum import Enum, auto
+from pathlib import Path
 
 from PyQt6.QtCore import (QSize, Qt, QRectF)
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QGraphicsView,
-                             QLabel, QGridLayout, QWidget, QPushButton, QVBoxLayout, QFormLayout, QSlider)
+                             QLabel, QGridLayout, QWidget, QPushButton, QVBoxLayout, QFormLayout, QSlider, QFileDialog)
 from PyQt6.QtGui import (QAction, QPixmap, QImage)
 
 from cap import CaptureThread
@@ -55,14 +56,14 @@ class MainWindow(QMainWindow):
         self.mean_pi_l = QLabel('Mean Pixel Intensity')
         self.pi_std_l = QLabel('Pixel Intensity STD')
         self.min_max_pi_l = QLabel('Min / Max Pixel Intensity')
-        self.coords_bright_l = QLabel('Coords and Pixel Brightness')
+        # self.coords_bright_l = QLabel('Coords and Pixel Brightness')
 
         self.info_layout = QFormLayout()
         self.info_layout.addWidget(self.fps_l)
         self.info_layout.addWidget(self.mean_pi_l)
         self.info_layout.addWidget(self.pi_std_l)
         self.info_layout.addWidget(self.min_max_pi_l)
-        self.info_layout.addWidget(self.coords_bright_l)
+        # self.info_layout.addWidget(self.coords_bright_l)
 
         self.main_layout.addWidget(self.image_view, 0, 0)
         self.main_layout.addLayout(self.info_layout, 0, 1, 1, 3)
@@ -81,9 +82,13 @@ class MainWindow(QMainWindow):
         contrast_mode_act = QAction('&Contrast Mode', self)
         contrast_mode_act.triggered.connect(self.__contrast_mode)
 
+        neural_net_act = QAction('&Neural Mode', self)
+        neural_net_act.triggered.connect(self.__neural_mode)
+
         actions = [manual_mode_act,
                    motion_mode_act,
-                   contrast_mode_act]
+                   contrast_mode_act,
+                   neural_net_act]
         self.actions_tool_bar.addActions(actions)
 
     def __init_params(self):
@@ -200,8 +205,8 @@ class MainWindow(QMainWindow):
             f'Pixel Intensity STD:\n{np.round(self.pi_std, 2).flatten()}')
         self.min_max_pi_l.setText(
             f'Min / Max Pixel Intensity:\n{self.min_max_pi}')
-        self.coords_bright_l.setText(
-            f'Coords and Pixel Brightness:\n{self.coords_bright}')
+        # self.coords_bright_l.setText(
+        #     f'Coords and Pixel Brightness:\n{self.coords_bright}')
 
     def __manual_mode(self):
         self.capturer.bbox = None
@@ -215,10 +220,6 @@ class MainWindow(QMainWindow):
         self.capturer.current_mode = self.capturer.current_mode.MOTION
         self.capturer.mode_state = self.capturer.ModeState.DEFAULT
         self.__clear_sliders()
-        min_size_slider = self.__create_custom_slider(
-            'Min Size', 0, 5000, 150, 0)
-        max_size_slider = self.__create_custom_slider(
-            'Max Size', 0, 5000, 150, 2500)
         h_min_slider = self.__create_custom_slider('H min', 0, 255, 150, 0)
         h_max_slider = self.__create_custom_slider('H max', 0, 255, 150, 255)
         s_min_slider = self.__create_custom_slider('S min', 0, 255, 150, 0)
@@ -228,8 +229,6 @@ class MainWindow(QMainWindow):
         btn = QPushButton('Применить')
         btn.clicked.connect(self.__apply_det_params)
 
-        self.info_layout.addRow(min_size_slider)
-        self.info_layout.addRow(max_size_slider)
         self.info_layout.addRow(h_min_slider)
         self.info_layout.addRow(h_max_slider)
         self.info_layout.addRow(s_min_slider)
@@ -243,11 +242,39 @@ class MainWindow(QMainWindow):
         self.capturer.current_mode = self.capturer.current_mode.CONTRAST
         self.capturer.mode_state = self.capturer.ModeState.DEFAULT
         self.__clear_sliders()
-        # min_size_slider = self.__create_custom_slider('Min Size', 0, 255, 150, 0)
-        # max_size_slider = self.__create_custom_slider('Max Size', 0, 5000, 150, 2500)
+        h_min_slider = self.__create_custom_slider(
+            'Brightness min', 0, 255, 150, 0)
+        h_max_slider = self.__create_custom_slider(
+            'Brightness max', 0, 255, 150, 255)
 
-        # self.info_layout.addRow(min_size_slider)
-        # self.info_layout.addRow(max_size_slider)
+        self.info_layout.addRow(h_min_slider)
+        self.info_layout.addRow(h_max_slider)
+
+    def __neural_mode(self):
+        self.capturer.bbox = None
+        self.capturer.current_mode = self.capturer.current_mode.NEURAL
+        self.capturer.mode_state = self.capturer.ModeState.INIT
+        self.__clear_sliders()
+        
+        input_model_btn = QPushButton('Выбрать модель')
+        input_classes_btn = QPushButton('Выбрать файл с классами')
+
+
+        input_model_btn.clicked.connect(self.__onInputModelClick)
+        input_classes_btn.clicked.connect(self.__onInputClassesClick)
+
+        self.info_layout.addRow(input_model_btn)
+        self.info_layout.addRow(input_classes_btn)
+
+    def __onInputModelClick(self):
+        home_dir = str(Path.home())
+        fname = QFileDialog.getOpenFileName(self, 'Open file', home_dir)
+        self.capturer.model_path = fname[0]
+
+    def __onInputClassesClick(self):
+        home_dir = str(Path.home())
+        fname = QFileDialog.getOpenFileName(self, 'Open file', home_dir)
+        self.capturer.classes_path = fname[0]
 
     def __clear_sliders(self):
         count = self.info_layout.count()
